@@ -26,6 +26,7 @@ import org.neo4j.cypher.internal.compiler.v3_0.helpers.JavaResultValueConverter
 import org.neo4j.cypher.internal.compiler.v3_0.prettifier.Prettifier
 import org.neo4j.cypher.internal.compiler.v3_0.{LRUCache => LRUCachev3_0, _}
 import org.neo4j.cypher.internal.tracing.{CompilationTracer, TimingCompilationTracer}
+import org.neo4j.cypher.internal.transaction.impl.InternalTransactionOperations
 import org.neo4j.cypher.internal.{CypherCompiler, _}
 import org.neo4j.graphdb.GraphDatabaseService
 import org.neo4j.graphdb.config.Setting
@@ -157,14 +158,15 @@ class ExecutionEngine(graph: GraphDatabaseService, logProvider: LogProvider = Nu
       while (n < ExecutionEngine.PLAN_BUILDING_TRIES) {
         // create transaction and query context
         var touched = false
-        val isTopLevelTx = !txBridge.hasTransaction
-        val tx = graph.beginTx()
-        val kernelStatement = txBridge.get()
+        val tx = txOps.beginTransaction()
+        val graphTx = txOps.graphTransaction(tx)
+        val isTopLevel = txOps.isTopLevelTransaction(tx)
+        val statement = txOps.currentStatement(tx)
 
         val (plan: ExecutionPlan, extractedParameters) = try {
           // fetch plan cache
-          val cache: LRUCachev3_0[String, (ExecutionPlan, Map[String, Any])] = getOrCreateFromSchemaState(kernelStatement, {
-            cacheMonitor.cacheFlushDetected(kernelStatement)
+          val cache: LRUCachev3_0[String, (ExecutionPlan, Map[String, Any])] = getOrCreateFromSchemaState(statement, {
+            cacheMonitor.cacheFlushDetected(statement)
             new LRUCachev3_0[String, (ExecutionPlan, Map[String, Any])](getPlanCacheSize)
           })
 
@@ -172,10 +174,10 @@ class ExecutionEngine(graph: GraphDatabaseService, logProvider: LogProvider = Nu
             cacheAccessor.getOrElseUpdate(cache)(cacheKey, {
               touched = true
               val parsedQuery = parsePreParsedQuery(preParsedQuery, phaseTracer)
-              parsedQuery.plan(kernelStatement, phaseTracer)
+              parsedQuery.plan(statement, phaseTracer)
             })
           }.flatMap { case (candidatePlan, params) =>
-            if (!touched && candidatePlan.isStale(lastCommittedTxId, kernelStatement)) {
+            if (!touched && candidatePlan.isStale(lastCommittedTxId, statement)) {
               cacheAccessor.remove(cache)(cacheKey, queryText)
               None
             } else {
@@ -184,22 +186,17 @@ class ExecutionEngine(graph: GraphDatabaseService, logProvider: LogProvider = Nu
           }.next()
         } catch {
           case (t: Throwable) =>
-            kernelStatement.close()
-            tx.failure()
-            tx.close()
+            txOps.abort(tx)
             throw t
         }
 
         if (touched) {
-          kernelStatement.close()
-          tx.success()
-          tx.close()
+          txOps.commit(tx)
         } else {
           // close the old statement reference after the statement has been "upgraded"
           // to either a schema data or a schema statement, so that the locks are "handed over".
-          kernelStatement.close()
           val preparedPlanExecution = PreparedPlanExecution(plan, executionMode, extractedParameters)
-          val txInfo = TransactionInfo(tx, isTopLevelTx, txBridge.get())
+          val txInfo = TransactionInfo(graphTx, isTopLevel, txOps.nextStatement(tx))
           return (preparedPlanExecution, txInfo)
         }
 
@@ -213,6 +210,8 @@ class ExecutionEngine(graph: GraphDatabaseService, logProvider: LogProvider = Nu
   private val txBridge = graph.asInstanceOf[GraphDatabaseAPI]
     .getDependencyResolver
     .resolveDependency(classOf[ThreadToStatementContextBridge])
+
+  private val txOps = new InternalTransactionOperations(graph, txBridge)
 
   private def getOrCreateFromSchemaState[V](statement: api.Statement, creator: => V) = {
     val javaCreator = new java.util.function.Function[ExecutionEngine, V]() {
