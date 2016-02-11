@@ -26,6 +26,7 @@ import org.neo4j.cypher.internal.compiler.v3_0.helpers.JavaResultValueConverter
 import org.neo4j.cypher.internal.compiler.v3_0.prettifier.Prettifier
 import org.neo4j.cypher.internal.compiler.v3_0.{LRUCache => LRUCachev3_0, _}
 import org.neo4j.cypher.internal.tracing.{CompilationTracer, TimingCompilationTracer}
+import org.neo4j.cypher.internal.transaction.impl.GraphBasedTransactionAccessProvider
 import org.neo4j.cypher.internal.{CypherCompiler, _}
 import org.neo4j.graphdb.GraphDatabaseService
 import org.neo4j.graphdb.config.Setting
@@ -57,6 +58,8 @@ class ExecutionEngine(graph: GraphDatabaseService, logProvider: LogProvider = Nu
   protected val kernel = graphAPI.getDependencyResolver.resolveDependency(classOf[org.neo4j.kernel.api.KernelAPI])
   private val lastCommittedTxId = LastCommittedTxIdProvider(graphAPI)
   protected val kernelMonitors: monitoring.Monitors = graphAPI.getDependencyResolver.resolveDependency(classOf[org.neo4j.kernel.monitoring.Monitors])
+  private val transactionProvider = new GraphBasedTransactionAccessProvider(graphAPI)
+
   private val compilationTracer: CompilationTracer = {
     if(optGraphSetting(graph, GraphDatabaseSettings.cypher_compiler_tracing, FALSE))
       new TimingCompilationTracer(kernelMonitors.newMonitor(classOf[TimingCompilationTracer.EventListener]))
