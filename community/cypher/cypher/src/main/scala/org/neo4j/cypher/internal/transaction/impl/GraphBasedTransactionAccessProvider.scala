@@ -38,7 +38,7 @@ class GraphBasedTransactionAccessProvider(graph: GraphDatabaseAPI) extends Trans
   private var writers = new AccessorRegistry[TransactionAccess]("TransactionWriteAccess")
   private var transactionControl = new GraphTransactionControl
 
-  override def currentTransaction = transactionControl.get().currentTransaction
+  override def currentTransaction = transactionControl.get().transaction
 
   override def acquireReadAccess(name: String): TransactionReadAccess = {
     if (writers.nonEmpty)
@@ -110,6 +110,8 @@ class GraphBasedTransactionAccessProvider(graph: GraphDatabaseAPI) extends Trans
     override def isExclusive: Boolean =
       failIfClosed { registry.size == 1 }
 
+    def discard() = close()
+
     override protected def close(): Unit = try {
         super.close()
       } finally  {
@@ -120,6 +122,9 @@ class GraphBasedTransactionAccessProvider(graph: GraphDatabaseAPI) extends Trans
   type GraphTransaction = GraphTransactionControl#GraphTransaction
 
   class GraphTransactionControl {
+
+    control =>
+
     private var graphTransaction: Option[GraphTransaction] = None
 
     def get() = graphTransaction match {
@@ -132,21 +137,26 @@ class GraphBasedTransactionAccessProvider(graph: GraphDatabaseAPI) extends Trans
         _graphTransaction
     }
 
+    def clear(): Unit = {
+      graphTransaction = None
+    }
+
     class GraphTransaction {
-      private var _transaction: Transaction = graph.beginTx()
-      private var _statement: Statement = null
-      private var _isTopLevelTx: Boolean = !txBridge.hasTransaction
+      private val _isTopLevelTx: Boolean = !txBridge.hasTransaction
       private var finishMode: FinishMode = KeepOpen
 
-      def isTopLevelTx = _isTopLevelTx
+      private val _transaction: Transaction = graph.beginTx()
+      private var _statement: Statement = null
 
-      // TODO: Temporary hack
-      def currentTransaction = _transaction
+      def transaction = _transaction
 
       def statement = {
-        openStatement()
+        if (_statement == null)
+          _statement = txBridge.get()
         _statement
       }
+
+      def isTopLevelTx = _isTopLevelTx
 
       def markTo(newMode: FinishMode) {
         finishMode = finishMode.update(newMode)
@@ -154,33 +164,35 @@ class GraphBasedTransactionAccessProvider(graph: GraphDatabaseAPI) extends Trans
 
       def finish(): Unit = finishMode match {
         case Commit =>
-          try { _transaction.success() } finally { closeUnderlyingTransaction() }
+          try {
+            closeStatement()
+            transaction.success()
+            transaction.close()
+          } finally {
+            control.clear()
+          }
 
         case Abort =>
-          try { _transaction.failure() } finally { closeUnderlyingTransaction() }
+          try {
+            closeStatement()
+            transaction.failure()
+            transaction.close()
+          } finally {
+            control.clear()
+          }
 
         case KeepOpen =>
           // free associated locks etc
           closeStatement()
       }
 
-      private def openStatement(): Unit = {
-        if (_statement == null) {
-          _statement = txBridge.get()
-        }
-      }
-
-      private def closeStatement(): Unit = {
+      private def closeStatement(): Unit =
+      {
         if (_statement != null) {
-          try { _statement.close() } finally { _statement = null }
+          _statement.close()
+          _statement = null
         }
       }
-      private def closeUnderlyingTransaction(): Unit = try {
-          closeStatement()
-          _transaction.close()
-        } finally {
-          graphTransaction = None
-        }
     }
   }
 }

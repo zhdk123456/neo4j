@@ -36,6 +36,9 @@ trait TransactionAccess {
 
   def statement: Statement
 
+  // Temporary Hack
+  def discard()
+
   def commit()
   def abort()
 }
