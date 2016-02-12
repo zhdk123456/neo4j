@@ -24,15 +24,19 @@ package org.neo4j.cypher.internal.transaction.api
   */
 trait TransactionOperations {
   type Transaction
+  type Statement
 
   def isTopLevelTransaction(transaction: Transaction): Boolean
   def beginTransaction(): Transaction
 
-  // TODO: Temporary hack
-  def graphTransaction(transaction: Transaction): org.neo4j.graphdb.Transaction
+  // TODO: Temporary hack; should go away completely
+  def graphTransaction(transaction: Transaction): GraphTransaction
 
-  def currentStatement(transaction: Transaction): TransactionStatement
-  def nextStatement(transaction: Transaction): TransactionStatement
+  def currentStatement(transaction: Transaction): Statement
+  def nextStatement(transaction: Transaction): Statement
+
+  // TODO: Temporary hack; replace with direct access to operations as needed
+  def kernelStatement(statement: Statement): KernelStatement
 
   def abort(transaction: Transaction)
   def commit(transaction: Transaction)

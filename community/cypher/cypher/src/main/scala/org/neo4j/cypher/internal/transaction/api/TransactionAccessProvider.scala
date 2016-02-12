@@ -23,7 +23,7 @@ trait TransactionAccessProvider {
   def acquireReadAccess(): TransactionReadAccess
   def acquireWriteAccess(): TransactionWriteAccess
 
-  // TODO: Temporary Hack
+  // TODO: Temporary Hack; should go away once refactoring is complete
   def currentGraphTransaction: Option[org.neo4j.graphdb.Transaction]
 }
 
@@ -31,9 +31,9 @@ trait TransactionAccess {
   def insideTopLevelTransaction: Boolean
 
   // TODO: Temporary Hack (?); Expose operations in subinterfaces instead?
-  def statement: TransactionStatement
+  def statement: KernelStatement
 
-  // TODO: Temporary Hack
+  // TODO: Temporary Hack; should go away once refactoring is complete
   def discard()
 
   def commit()
@@ -44,4 +44,6 @@ trait TransactionReadAccess extends TransactionAccess {
   def release()
 }
 
-trait TransactionWriteAccess extends TransactionAccess
+trait TransactionWriteAccess extends TransactionAccess {
+  def commitAndReOpen()
+}

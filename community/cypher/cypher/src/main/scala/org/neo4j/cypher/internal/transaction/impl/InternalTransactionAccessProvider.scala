@@ -35,8 +35,8 @@ class InternalTransactionAccessProvider(ops: TransactionOperations) extends Tran
   override def acquireReadAccess(): TransactionReadAccess =
     new AbstractTransactionAccess(OpenForReading) with TransactionReadAccess {
       // TODO: Temporary Hack (?); Expose operations in subinterfaces instead?
-      override def statement: TransactionStatement =
-        failIfClosed { ops.currentStatement(transaction) }
+      override def statement: KernelStatement =
+        failIfClosed { ops.kernelStatement(ops.currentStatement(transaction)) }
 
       override def release(): Unit =
         runAndClose { ops.nextStatement(transaction) }
@@ -45,8 +45,14 @@ class InternalTransactionAccessProvider(ops: TransactionOperations) extends Tran
   def acquireWriteAccess(): TransactionWriteAccess = {
     new AbstractTransactionAccess(OpenForWriting) with TransactionWriteAccess {
       // TODO: Temporary Hack (?); Expose operations in subinterfaces instead?
-      override def statement: TransactionStatement =
-        failIfClosed { ops.currentStatement(transaction) }
+      override def statement: KernelStatement =
+        failIfClosed { ops.kernelStatement(ops.currentStatement(transaction)) }
+
+      override def commitAndReOpen(): Unit = {
+        ops.commit(transaction)
+        releaseTransaction()
+        acquireTransaction(OpenForWriting)
+      }
     }
   }
 
