@@ -23,30 +23,20 @@ sealed trait InternalTransactionState {
   self =>
 
   def updatedWith(newState: InternalTransactionState): InternalTransactionState =
-    if (self == newState)
-      newState
-    else
-      throw new IllegalStateException(s"Cant change transaction state from $self to $newState")
+    throw new IllegalStateException(s"Cant change transaction state from $self to $newState")
 }
 
 case object OpenForReading extends InternalTransactionState {
-  override def updatedWith(newState: InternalTransactionState) = newState match {
-    case Closed => newState
-    case _ => super.updatedWith(newState)
-  }
+  override def updatedWith(newState: InternalTransactionState) = newState
 }
 
 case object OpenForWriting extends InternalTransactionState {
   override def updatedWith(newState: InternalTransactionState) = newState match {
-    case Closed => newState
-    case _ => super.updatedWith(newState)
+    case OpenForReading => super.updatedWith(newState)
+    case _ => newState
   }
 }
 
 case object Closed extends InternalTransactionState {
-  override def updatedWith(newState: InternalTransactionState) = newState match {
-    case OpenForReading => newState
-    case OpenForWriting => newState
-    case _ => super.updatedWith(newState)
-  }
+  override def updatedWith(newState: InternalTransactionState) = newState
 }

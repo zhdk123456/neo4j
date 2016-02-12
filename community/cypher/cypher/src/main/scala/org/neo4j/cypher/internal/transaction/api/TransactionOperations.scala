@@ -19,8 +19,6 @@
  */
 package org.neo4j.cypher.internal.transaction.api
 
-import org.neo4j.cypher.internal.transaction.impl.InternalTransaction
-
 /**
   * Low-level API for working with transactions
   */

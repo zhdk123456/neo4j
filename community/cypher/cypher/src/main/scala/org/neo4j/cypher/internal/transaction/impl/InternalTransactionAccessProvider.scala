@@ -57,6 +57,10 @@ class InternalTransactionAccessProvider(ops: TransactionOperations) extends Tran
 
     override def insideTopLevelTransaction: Boolean =
       failIfClosed { ops.isTopLevelTransaction(transaction) }
+
+    override def discard(): Unit =
+      runAndClose { releaseTransaction() }
+
     override def abort(): Unit =
       runAndClose { try { ops.abort(transaction) }  finally { releaseTransaction() } }
 

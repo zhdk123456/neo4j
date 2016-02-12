@@ -19,7 +19,6 @@
  */
 package org.neo4j.cypher.internal.transaction.api
 
-
 trait TransactionAccessProvider {
   def acquireReadAccess(): TransactionReadAccess
   def acquireWriteAccess(): TransactionWriteAccess
@@ -33,6 +32,9 @@ trait TransactionAccess {
 
   // TODO: Temporary Hack (?); Expose operations in subinterfaces instead?
   def statement: TransactionStatement
+
+  // TODO: Temporary Hack
+  def discard()
 
   def commit()
   def abort()

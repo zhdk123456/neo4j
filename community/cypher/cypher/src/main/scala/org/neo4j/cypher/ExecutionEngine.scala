@@ -26,7 +26,7 @@ import org.neo4j.cypher.internal.compiler.v3_0.helpers.JavaResultValueConverter
 import org.neo4j.cypher.internal.compiler.v3_0.prettifier.Prettifier
 import org.neo4j.cypher.internal.compiler.v3_0.{LRUCache => LRUCachev3_0, _}
 import org.neo4j.cypher.internal.tracing.{CompilationTracer, TimingCompilationTracer}
-import org.neo4j.cypher.internal.transaction.impl.InternalTransactionOperations
+import org.neo4j.cypher.internal.transaction.impl.{InternalTransactionAccessProvider, InternalTransactionOperations}
 import org.neo4j.cypher.internal.{CypherCompiler, _}
 import org.neo4j.graphdb.GraphDatabaseService
 import org.neo4j.graphdb.config.Setting
@@ -158,10 +158,8 @@ class ExecutionEngine(graph: GraphDatabaseService, logProvider: LogProvider = Nu
       while (n < ExecutionEngine.PLAN_BUILDING_TRIES) {
         // create transaction and query context
         var touched = false
-        val tx = txOps.beginTransaction()
-        val graphTx = txOps.graphTransaction(tx)
-        val isTopLevel = txOps.isTopLevelTransaction(tx)
-        val statement = txOps.currentStatement(tx)
+        val tx = txAccessProvider.acquireReadAccess()
+        val statement = tx.statement
 
         val (plan: ExecutionPlan, extractedParameters) = try {
           // fetch plan cache
@@ -186,17 +184,22 @@ class ExecutionEngine(graph: GraphDatabaseService, logProvider: LogProvider = Nu
           }.next()
         } catch {
           case (t: Throwable) =>
-            txOps.abort(tx)
+            tx.abort()
             throw t
         }
 
         if (touched) {
-          txOps.commit(tx)
+          tx.commit()
         } else {
           // close the old statement reference after the statement has been "upgraded"
           // to either a schema data or a schema statement, so that the locks are "handed over".
           val preparedPlanExecution = PreparedPlanExecution(plan, executionMode, extractedParameters)
-          val txInfo = TransactionInfo(graphTx, isTopLevel, txOps.nextStatement(tx))
+          tx.release()
+
+          val nextTx = txAccessProvider.acquireWriteAccess()
+          val txInfo = TransactionInfo(txAccessProvider.currentGraphTransaction.get, nextTx.insideTopLevelTransaction, nextTx.statement)
+          nextTx.discard()
+
           return (preparedPlanExecution, txInfo)
         }
 
@@ -207,11 +210,15 @@ class ExecutionEngine(graph: GraphDatabaseService, logProvider: LogProvider = Nu
     throw new IllegalStateException("Could not execute query due to insanely frequent schema changes")
   }
 
+  // TODO: Remove field
   private val txBridge = graph.asInstanceOf[GraphDatabaseAPI]
     .getDependencyResolver
     .resolveDependency(classOf[ThreadToStatementContextBridge])
 
+  // TODO: Remove field
   private val txOps = new InternalTransactionOperations(graph, txBridge)
+
+  private val txAccessProvider = new InternalTransactionAccessProvider(txOps)
 
   private def getOrCreateFromSchemaState[V](statement: api.Statement, creator: => V) = {
     val javaCreator = new java.util.function.Function[ExecutionEngine, V]() {
