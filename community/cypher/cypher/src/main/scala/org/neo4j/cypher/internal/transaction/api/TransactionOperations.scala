@@ -31,7 +31,7 @@ trait TransactionOperations {
   def beginTransaction(): Transaction
 
   // TODO: Temporary hack
-  def graphTransaction(transaction: InternalTransaction): org.neo4j.graphdb.Transaction
+  def graphTransaction(transaction: Transaction): org.neo4j.graphdb.Transaction
 
   def currentStatement(transaction: Transaction): TransactionStatement
   def nextStatement(transaction: Transaction): TransactionStatement

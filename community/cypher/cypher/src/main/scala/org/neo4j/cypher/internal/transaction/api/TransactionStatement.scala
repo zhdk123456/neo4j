@@ -3,7 +3,7 @@ package org.neo4j.cypher.internal.transaction.api
 import org.neo4j.kernel.api._
 
 /**
- * Give access to underlying kernel statement without exposing close
+ * Give access to underlying kernel statement without exposing close (eventually)
  */
 trait TransactionStatement
   // TODO: Temporary hack

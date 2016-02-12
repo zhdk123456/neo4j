@@ -19,55 +19,27 @@
  */
 package org.neo4j.cypher.internal.transaction.api
 
-import org.neo4j.graphdb.Transaction
-import org.neo4j.kernel.api.Statement
 
 trait TransactionAccessProvider {
-  def acquireReadAccess(name: String): TransactionReadAccess
-  def acquireWriteAccess(name: String): TransactionWriteAccess
+  def acquireReadAccess(): TransactionReadAccess
+  def acquireWriteAccess(): TransactionWriteAccess
 
-  // Temporary Hack
-  def currentTransaction: Transaction
+  // TODO: Temporary Hack
+  def currentGraphTransaction: Option[org.neo4j.graphdb.Transaction]
 }
 
 trait TransactionAccess {
   def insideTopLevelTransaction: Boolean
-  def isExclusive: Boolean
 
-  def statement: Statement
-
-  // Temporary Hack
-  def discard()
+  // TODO: Temporary Hack (?); Expose operations in subinterfaces instead?
+  def statement: TransactionStatement
 
   def commit()
   def abort()
 }
 
 trait TransactionReadAccess extends TransactionAccess {
-  def commit(): Unit = {
-    if (isExclusive) {
-      markToCommit()
-      release()
-    } else {
-      throw new IllegalStateException("Cannot commit directly from non-exclusive read access")
-    }
-  }
-
-  def abort(): Unit = {
-    if (isExclusive) {
-      markToAbort()
-      release()
-    } else {
-      throw new IllegalStateException("Cannot abort directly from non-exclusive read access")
-    }
-  }
-
-  def markToCommit()
-  def markToAbort()
-
   def release()
 }
 
-trait TransactionWriteAccess extends TransactionAccess {
-  override final def isExclusive = true
-}
+trait TransactionWriteAccess extends TransactionAccess

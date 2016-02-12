@@ -24,10 +24,16 @@ trait CloseableOnce {
 
   def isOpen = open
 
-  protected def close(): Unit = failIfClosed {
+  protected final def runAndClose[X](thunk: => X): X =
+    failIfClosed { try { thunk } finally { doClose() } }
+
+  protected final def close(): Unit =
+    failIfClosed { doClose() }
+
+  protected final def failIfClosed[X](thunk: => X): X =
+    if (isOpen) thunk else throw new IllegalStateException("Already closed")
+
+  protected def doClose(): Unit = {
     open = false
   }
-
-  protected def failIfClosed[X](thunk: => X): X =
-    if (isOpen) thunk else throw new IllegalStateException("Already closed")
 }
