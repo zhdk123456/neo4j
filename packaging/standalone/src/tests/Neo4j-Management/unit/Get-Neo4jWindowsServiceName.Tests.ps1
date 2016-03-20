@@ -8,7 +8,7 @@ Import-Module "$src\Neo4j-Management.psm1"
 InModuleScope Neo4j-Management {
   Describe "Get-Neo4jWindowsServiceName" {
 
-
+# Refactor
     Context "Missing service name in configuration files" {
       Mock Get-Neo4jSetting { throw "Missing service name" }
 

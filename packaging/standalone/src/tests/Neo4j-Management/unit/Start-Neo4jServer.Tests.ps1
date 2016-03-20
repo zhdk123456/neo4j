@@ -7,7 +7,7 @@ Import-Module "$src\Neo4j-Management.psm1"
 
 InModuleScope Neo4j-Management {
   Describe "Start-Neo4jServer" {
-
+# Refactor
     Context "Invalid or missing server object" {
       It "throws error for an invalid server object - Server" {
         { Start-Neo4jServer -Server -Neo4jServer (New-Object -TypeName PSCustomObject) -ErrorAction Stop } | Should Throw
