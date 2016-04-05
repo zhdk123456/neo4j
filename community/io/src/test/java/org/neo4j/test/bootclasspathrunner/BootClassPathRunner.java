@@ -141,7 +141,9 @@ public class BootClassPathRunner extends Runner
         Registry registry = LocateRegistry.getRegistry( rmiPort );
         RemoteRunNotifier remote = (RemoteRunNotifier) registry.lookup( RMI_RUN_NOTIFIER_NAME );
 
+//        Runner runner = new VerboseBlockJUnit4ClassRunner( testClass );
         Runner runner = new BlockJUnit4ClassRunner( testClass );
+        
         runner.run( new DelegatingRunNotifier( remote ) );
     }
 }
