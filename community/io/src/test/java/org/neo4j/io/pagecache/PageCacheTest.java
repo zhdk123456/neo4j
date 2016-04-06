@@ -139,18 +139,36 @@ public abstract class PageCacheTest<T extends PageCache> extends PageCacheTestSu
     @Test( timeout = SHORT_TIMEOUT_MILLIS )
     public void mustReadExistingData() throws IOException
     {
+        long start = System.nanoTime();
         generateFileWithRecords( file( "a" ), recordCount, recordSize );
+        long end = System.nanoTime();
+        System.out.println( "file generation took: " + TimeUnit.NANOSECONDS.toMillis( end - start ) + "ms" );
 
+        long start0 = System.nanoTime();
         PageCache cache = getPageCache( fs, maxPages, pageCachePageSize, PageCacheTracer.NULL );
+        long end0 = System.nanoTime();
+        System.out.println( "getPageCache took: " + TimeUnit.NANOSECONDS.toMillis( end0 - start0 ) + "ms" );
 
+        long start1 = System.nanoTime();
         int recordId = 0;
         try ( PagedFile pagedFile = cache.map( file( "a" ), filePageSize );
               PageCursor cursor = pagedFile.io( 0L, PF_SHARED_READ_LOCK ) )
         {
+            long end1 = System.nanoTime();
+            System.out.println( "mapping took: " + TimeUnit.NANOSECONDS.toMillis( end1 - start1 ) + "ms" );
+
+            long start2 = System.nanoTime();
             while ( cursor.next() )
             {
+                long end2 = System.nanoTime();
+                System.out.println( "cursor.next took: " + TimeUnit.NANOSECONDS.toMillis( end2 - start2 ) + "ms" );
+                start2 = System.nanoTime();
+
+                long start3 = System.nanoTime();
                 verifyRecordsMatchExpected( cursor );
                 recordId += recordsPerFilePage;
+                long end3 = System.nanoTime();
+                System.out.println( "verification took: " + TimeUnit.NANOSECONDS.toMillis( end3 - start3 ) + "ms" );
             }
         }
 
