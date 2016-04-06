@@ -31,6 +31,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -173,12 +174,17 @@ public abstract class PageCacheTestSupport<T extends PageCache>
      */
     protected void verifyRecordsMatchExpected( PageCursor cursor ) throws IOException
     {
+        long start = System.nanoTime();
         ByteBuffer expectedPageContents = ByteBuffer.allocate( filePageSize );
         ByteBuffer actualPageContents = ByteBuffer.allocate( filePageSize );
         byte[] record = new byte[recordSize];
         long pageId = cursor.getCurrentPageId();
+        long end = System.nanoTime();
+        System.out.println( "verification: preparation took: " + TimeUnit.NANOSECONDS.toMillis( end - start ) + "ms" );
+
         for ( int i = 0; i < recordsPerFilePage; i++ )
         {
+            long start1 = System.nanoTime();
             long recordId = (pageId * recordsPerFilePage) + i;
             expectedPageContents.position( recordSize * i );
             generateRecordForId( recordId, expectedPageContents.slice() );
@@ -186,15 +192,19 @@ public abstract class PageCacheTestSupport<T extends PageCache>
             {
                 cursor.setOffset( recordSize * i );
                 cursor.getBytes( record );
-            } while ( cursor.shouldRetry() );
+            }
+            while ( cursor.shouldRetry() );
             actualPageContents.position( recordSize * i );
             actualPageContents.put( record );
+            long end1 = System.nanoTime();
+            System.out.println( "verification iteration "+i+" took: " + TimeUnit.NANOSECONDS.toMillis( end1 - start1 ) + "ms" );
         }
         assertRecord( pageId, actualPageContents, expectedPageContents );
     }
 
     protected void assertRecord( long pageId, ByteBuffer actualPageContents, ByteBuffer expectedPageContents )
     {
+        long start = System.nanoTime();
         byte[] actualBytes = actualPageContents.array();
         byte[] expectedBytes = expectedPageContents.array();
         int estimatedPageId = estimateId( actualBytes );
@@ -205,6 +215,8 @@ public abstract class PageCacheTestSupport<T extends PageCache>
                 Math.abs( pageId - estimatedPageId ) + ")",
                 actualBytes,
                 byteArray( expectedBytes ) );
+        long end = System.nanoTime();
+        System.out.println( "assertRecord took: " + TimeUnit.NANOSECONDS.toMillis( end - start ) + "ms" );
     }
 
     protected int estimateId( byte[] record )
