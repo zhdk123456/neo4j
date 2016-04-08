@@ -21,7 +21,6 @@ package org.neo4j.io.pagecache;
 
 import org.apache.commons.lang3.SystemUtils;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.ByteArrayOutputStream;
@@ -345,7 +344,6 @@ public abstract class PageCacheTest<T extends PageCache> extends PageCacheTestSu
         }
     }
 
-    @Ignore
     @Test( timeout = SEMI_LONG_TIMEOUT_MILLIS )
     public void repeatablyWritesFlushedFromPageFileMustBeExternallyObservable() throws IOException
     {

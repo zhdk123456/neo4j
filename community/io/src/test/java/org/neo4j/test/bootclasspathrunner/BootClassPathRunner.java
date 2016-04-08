@@ -19,11 +19,15 @@
  */
 package org.neo4j.test.bootclasspathrunner;
 
+import org.junit.Test;
+import org.junit.internal.runners.statements.FailOnTimeout;
 import org.junit.runner.Description;
 import org.junit.runner.Runner;
 import org.junit.runner.notification.RunNotifier;
 import org.junit.runners.BlockJUnit4ClassRunner;
+import org.junit.runners.model.FrameworkMethod;
 import org.junit.runners.model.InitializationError;
+import org.junit.runners.model.Statement;
 
 import java.io.File;
 import java.lang.annotation.ElementType;
@@ -34,11 +38,14 @@ import java.net.URL;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
 import org.neo4j.io.proc.ProcessUtil;
+
+import static java.util.stream.Collectors.toList;
 
 public class BootClassPathRunner extends Runner
 {
@@ -143,8 +150,76 @@ public class BootClassPathRunner extends Runner
         RemoteRunNotifier remote = (RemoteRunNotifier) registry.lookup( RMI_RUN_NOTIFIER_NAME );
 
 //        Runner runner = new VerboseBlockJUnit4ClassRunner( testClass );
-        Runner runner = new BlockJUnit4ClassRunner( testClass );
+        Runner runner = new TestRunner( testClass );
         
         runner.run( new DelegatingRunNotifier( remote ) );
+    }
+
+    private static class TestRunner extends BlockJUnit4ClassRunner
+    {
+        public TestRunner( Class<?> klass ) throws InitializationError
+        {
+            super( klass );
+        }
+
+        @Override
+        protected Statement withPotentialTimeout( FrameworkMethod method, Object test, Statement next )
+        {
+            long timeout = getTimeout(method.getAnnotation(Test.class));
+            if (timeout <= 0) {
+                return next;
+            }
+            return new TestFailOnTimeout( next, timeout );
+        }
+
+        private long getTimeout(Test annotation) {
+            if (annotation == null) {
+                return 0;
+            }
+            return annotation.timeout();
+        }
+    }
+
+    private static class TestFailOnTimeout extends FailOnTimeout
+    {
+        public TestFailOnTimeout( Statement statement, long timeoutMillis )
+        {
+            super( statement, timeoutMillis );
+        }
+
+        @Override
+        public void evaluate() throws Throwable
+        {
+            try
+            {
+                super.evaluate();
+            }
+            finally
+            {
+                int i = 0;
+                boolean shouldWork = true;
+                while ( shouldWork ) {
+                    if ( i > 0 )
+                    {
+                        System.out.println( "Waiting for other 'Time-limited test' to complete" );
+                    }
+                    i++;
+                    List<Thread> trds = Thread.getAllStackTraces()
+                            .keySet()
+                            .stream()
+                            .filter( t -> "Time-limited test".equals( t.getName() ) )
+                            .collect( toList() );
+
+                    for ( Thread trd : trds )
+                    {
+                        Arrays.stream(trd.getStackTrace() ).forEach( System.out::println );
+                        System.out.println();
+                    }
+
+                    long count = trds.size();
+                    shouldWork = count > 0;
+                }
+            }
+        }
     }
 }
