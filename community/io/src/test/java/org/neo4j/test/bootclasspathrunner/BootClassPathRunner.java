@@ -105,6 +105,7 @@ public class BootClassPathRunner extends Runner
             command.add( String.valueOf( port ) );
             command.add( testClass.getName() );
 
+            System.out.println( "command = " + command );
             ProcessBuilder pb = new ProcessBuilder();
             pb.command( command );
             pb.inheritIO();

@@ -180,7 +180,7 @@ public abstract class PageCacheTestSupport<T extends PageCache>
         byte[] record = new byte[recordSize];
         long pageId = cursor.getCurrentPageId();
         long end = System.nanoTime();
-        System.out.println( "verification: preparation took: " + TimeUnit.NANOSECONDS.toMillis( end - start ) + "ms" );
+        PageCacheTest.log( "verification: preparation took: " + TimeUnit.NANOSECONDS.toMillis( end - start ) + "ms" );
 
         for ( int i = 0; i < recordsPerFilePage; i++ )
         {
@@ -197,7 +197,7 @@ public abstract class PageCacheTestSupport<T extends PageCache>
             actualPageContents.position( recordSize * i );
             actualPageContents.put( record );
             long end1 = System.nanoTime();
-            System.out.println( "verification iteration "+i+" took: " + TimeUnit.NANOSECONDS.toMillis( end1 - start1 ) + "ms" );
+            PageCacheTest.log( "verification iteration "+i+" took: " + TimeUnit.NANOSECONDS.toMillis( end1 - start1 ) + "ms" );
         }
         assertRecord( pageId, actualPageContents, expectedPageContents );
     }
@@ -216,7 +216,7 @@ public abstract class PageCacheTestSupport<T extends PageCache>
                 actualBytes,
                 byteArray( expectedBytes ) );
         long end = System.nanoTime();
-        System.out.println( "assertRecord took: " + TimeUnit.NANOSECONDS.toMillis( end - start ) + "ms" );
+        PageCacheTest.log( "assertRecord took: " + TimeUnit.NANOSECONDS.toMillis( end - start ) + "ms" );
     }
 
     protected int estimateId( byte[] record )
