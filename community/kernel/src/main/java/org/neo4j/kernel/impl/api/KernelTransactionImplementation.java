@@ -236,6 +236,7 @@ public class KernelTransactionImplementation implements KernelTransaction, TxSta
     public KernelTransactionImplementation initialize( long lastCommittedTx )
     {
         this.locks = locksManager.newClient();
+        this.context.init( locks );
         this.closing = closed = failure = success = terminated = false;
         this.transactionType = TransactionType.ANY;
         this.beforeHookInvoked = false;
@@ -431,7 +432,6 @@ public class KernelTransactionImplementation implements KernelTransaction, TxSta
         return hasTxStateWithChanges() && txState.hasDataChanges();
     }
 
-    // Only for test-access
     public TransactionRecordState getTransactionRecordState()
     {
         return recordState;
@@ -517,27 +517,23 @@ public class KernelTransactionImplementation implements KernelTransaction, TxSta
         try ( CommitEvent commitEvent = transactionEvent.beginCommitEvent() )
         {
             // Trigger transaction "before" hooks.
-            if ( hasTxStateWithChanges() )
+            if ( hasDataChanges() )
             {
-                if ( txState.hasDataChanges() )
+                try
                 {
-                    try
+                    if ( (hooksState = hooks.beforeCommit( txState, this, storeLayer )) != null && hooksState.failed() )
                     {
-                        if ( (hooksState = hooks.beforeCommit( txState, this, storeLayer )) != null && hooksState.failed() )
-                        {
-                            throw new TransactionFailureException( Status.Transaction.HookFailed, hooksState.failure(),
-                                    "" );
-                        }
-                    }
-                    finally
-                    {
-                        beforeHookInvoked = true;
+                        throw new TransactionFailureException( Status.Transaction.HookFailed, hooksState.failure(),
+                                "" );
                     }
                 }
-
-                context.init( locks );
-                prepareRecordChangesFromTransactionState();
+                finally
+                {
+                    beforeHookInvoked = true;
+                }
             }
+
+            prepareRecordChangesFromTransactionState();
 
             // Convert changes into commands and commit
             if ( hasChanges() )

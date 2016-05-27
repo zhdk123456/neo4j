@@ -39,22 +39,14 @@ public abstract class UnsafeTable<VALUE> extends PowerOfTwoQuantizedTable<VALUE>
         this.valueMarker = valueMarker;
         this.dataSize = (long)this.capacity*bytesPerEntry;
         this.address = UnsafeUtil.allocateMemory( dataSize );
-        clearTable();
-    }
-
-    private void clearTable()
-    {
-        UnsafeUtil.setMemory( address, dataSize, (byte)-1 );
+        clear();
     }
 
     @Override
     public void clear()
     {
-        if ( size > 0 )
-        {
-            clearTable();
-        }
         super.clear();
+        UnsafeUtil.setMemory( address, dataSize, (byte)-1 );
     }
 
     @Override
