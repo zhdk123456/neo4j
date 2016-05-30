@@ -70,4 +70,14 @@ class BufferingIdGenerator extends IdGenerator.Delegate
     {
         buffer.maintenance();
     }
+
+    @Override
+    public void close()
+    {
+        if ( buffer != null )
+        {
+            buffer.maintenance();
+        }
+        super.close();
+    }
 }
