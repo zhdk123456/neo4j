@@ -183,7 +183,6 @@ import org.neo4j.unsafe.batchinsert.LabelScanWriter;
 import org.neo4j.unsafe.impl.internal.dragons.FeatureToggles;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
-
 import static org.neo4j.helpers.collection.Iterables.toList;
 import static org.neo4j.kernel.impl.transaction.log.pruning.LogPruneStrategyFactory.fromConfigValue;
 
@@ -580,7 +579,10 @@ public class NeoStoreDataSource implements NeoStoresSupplier, Lifecycle, IndexPr
                 // Now that we've instantiated the component which can keep track of transaction boundaries
                 // we let the id generator know about it.
                 bufferingIdGeneratorFactory.initialize( kernelModule.kernelTransactions() );
-                life.add( freeIdMaintenance( bufferingIdGeneratorFactory ) );
+                BufferedIdMaintenanceController idMaintenanceController =
+                        new BufferedIdMaintenanceController( bufferingIdGeneratorFactory );
+                dependencies.satisfyDependencies( idMaintenanceController );
+                life.add( (Lifecycle) idMaintenanceController );
             }
 
             // Do these assignments last so that we can ensure no cyclical dependencies exist
@@ -637,33 +639,6 @@ public class NeoStoreDataSource implements NeoStoresSupplier, Lifecycle, IndexPr
          * kernel panics.
          */
         kernelHealth.healed();
-    }
-
-    private Lifecycle freeIdMaintenance( final BufferingIdGeneratorFactory bufferingIdGeneratorFactory )
-    {
-        return new LifecycleAdapter()
-        {
-            private JobHandle jobHandle;
-
-            @Override
-            public void start() throws Throwable
-            {
-                jobHandle = scheduler.scheduleRecurring( JobScheduler.Groups.storageMaintenance, new Runnable()
-                {
-                    @Override
-                    public void run()
-                    {
-                        bufferingIdGeneratorFactory.maintenance();
-                    }
-                }, 1, SECONDS );
-            }
-
-            @Override
-            public void stop() throws Throwable
-            {
-                jobHandle.cancel( false );
-            }
-        };
     }
 
     // Startup sequence
@@ -1425,5 +1400,40 @@ public class NeoStoreDataSource implements NeoStoresSupplier, Lifecycle, IndexPr
     {
         public static final Setting<String> keep_logical_logs = GraphDatabaseSettings.keep_logical_logs;
         public static final Setting<Boolean> read_only = GraphDatabaseSettings.read_only;
+    }
+
+    public class BufferedIdMaintenanceController extends LifecycleAdapter
+    {
+        private final BufferingIdGeneratorFactory bufferingIdGeneratorFactory;
+        private JobHandle jobHandle;
+
+        BufferedIdMaintenanceController( BufferingIdGeneratorFactory bufferingIdGeneratorFactory )
+        {
+            this.bufferingIdGeneratorFactory = bufferingIdGeneratorFactory;
+        }
+
+        @Override
+        public void start() throws Throwable
+        {
+            jobHandle = scheduler.scheduleRecurring( JobScheduler.Groups.storageMaintenance, new Runnable()
+            {
+                @Override
+                public void run()
+                {
+                    maintenance();
+                }
+            }, 1, SECONDS );
+        }
+
+        @Override
+        public void stop() throws Throwable
+        {
+            jobHandle.cancel( false );
+        }
+
+        public void maintenance()
+        {
+            bufferingIdGeneratorFactory.maintenance();
+        }
     }
 }
