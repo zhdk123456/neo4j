@@ -81,8 +81,9 @@ public class CommunityEditionModule
         LifeSupport life = platformModule.life;
         GraphDatabaseFacade graphDatabaseFacade = platformModule.graphDatabaseFacade;
 
-        lockManager = dependencies.satisfyDependency( createLockManager( config, logging ) );
+        preConfigureEdition(config);
 
+        lockManager = dependencies.satisfyDependency( createLockManager( config, logging ) );
         idGeneratorFactory = dependencies.satisfyDependency( createIdGeneratorFactory( fileSystem ) );
 
         propertyKeyTokenHolder = life.add( dependencies.satisfyDependency( new DelegatingPropertyKeyTokenHolder(
@@ -110,6 +111,11 @@ public class CommunityEditionModule
         registerRecovery( config.get( GraphDatabaseFacadeFactory.Configuration.editionName), life, dependencies );
 
         publishEditionInfo( dependencies.resolveDependency( UsageData.class ) );
+    }
+
+    protected void preConfigureEdition( Config config )
+    {
+        // empty
     }
 
     protected ConstraintSemantics createSchemaRuleVerifier()
