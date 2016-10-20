@@ -26,5 +26,5 @@ public enum OperationalMode
     single,
     ha,
     core,
-    read_replica
+    edge
 }
