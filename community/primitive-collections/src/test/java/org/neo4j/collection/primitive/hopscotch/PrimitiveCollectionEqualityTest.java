@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 
 import org.neo4j.collection.primitive.Primitive;
 import org.neo4j.collection.primitive.PrimitiveCollection;
@@ -39,6 +40,7 @@ import org.neo4j.collection.primitive.PrimitiveLongLongMap;
 import org.neo4j.collection.primitive.PrimitiveLongObjectMap;
 import org.neo4j.collection.primitive.PrimitiveLongSet;
 import org.neo4j.function.Factory;
+import org.neo4j.unsafe.impl.internal.dragons.UnsafeUtil;
 
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
@@ -360,9 +362,14 @@ public class PrimitiveCollectionEqualityTest
 
     private void assertEquals( PrimitiveCollection a, PrimitiveCollection b )
     {
+        long startTime = System.nanoTime();
         assertThat( a, is( equalTo( b ) ) );
         assertThat( b, is( equalTo( a ) ) );
         assertThat( a.hashCode(), is( equalTo( b.hashCode() ) ) );
+        if ( TimeUnit.NANOSECONDS.toMillis( System.nanoTime() - startTime ) > 1000 )
+        {
+            UnsafeUtil.dumpAllocationRecords();
+        }
     }
 
     @Theory

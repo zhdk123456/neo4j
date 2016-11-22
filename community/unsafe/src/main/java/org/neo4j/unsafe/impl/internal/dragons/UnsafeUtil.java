@@ -410,6 +410,11 @@ public final class UnsafeUtil
     private static final FreeTrace[] freeTraces = CHECK_NATIVE_ACCESS? new FreeTrace[4096] : null;
     private static final AtomicLong freeTraceCounter = new AtomicLong();
 
+    public static void dumpAllocationRecords()
+    {
+        System.out.println( pointers );
+    }
+
     private static void addAllocatedPointer( long pointer, long sizeInBytes )
     {
         if ( CHECK_NATIVE_ACCESS )
